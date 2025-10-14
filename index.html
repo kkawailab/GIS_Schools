@@ -158,7 +158,12 @@
 
         // GeoJSONデータを読み込み
         fetch('P29-23_23.geojson')
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 // ローディング表示を消す
                 document.getElementById('loading').style.display = 'none';
@@ -225,8 +230,18 @@
             .catch(error => {
                 console.error('❌ データの読み込みに失敗しました:', error);
                 document.getElementById('loading').innerHTML =
-                    'データの読み込みに失敗しました。<br>P29-23_23.geojson ファイルが同じディレクトリにあるか確認してください。';
+                    `データの読み込みに失敗しました。<br><br>` +
+                    `<strong>エラー:</strong> ${error.message}<br><br>` +
+                    `<strong>考えられる原因:</strong><br>` +
+                    `1. ファイルを直接開いている（file://）<br>` +
+                    `　→ ローカルサーバーで起動してください<br>` +
+                    `　　例: python -m http.server 8000<br><br>` +
+                    `2. P29-23_23.geojsonが同じディレクトリにない<br><br>` +
+                    `詳細はブラウザのコンソールを確認してください。`;
                 document.getElementById('loading').style.color = 'red';
+                document.getElementById('loading').style.fontSize = '13px';
+                document.getElementById('loading').style.textAlign = 'left';
+                document.getElementById('loading').style.maxWidth = '500px';
             });
     </script>
 </body>
