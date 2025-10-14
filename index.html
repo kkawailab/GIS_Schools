@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>愛知県 学校マップ</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #map {
+            width: 100%;
+            height: 100vh;
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            max-width: 300px;
+        }
+
+        .info-panel h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .info-panel p {
+            font-size: 14px;
+            color: #666;
+            margin: 5px 0;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            right: 10px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+
+        .legend h3 {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 5px 0;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 8px;
+            border: 2px solid #fff;
+            box-shadow: 0 0 3px rgba(0,0,0,0.3);
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 2000;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading" class="loading">地図データを読み込み中...</div>
+
+    <div id="map"></div>
+
+    <div class="info-panel">
+        <h2>愛知県 学校マップ</h2>
+        <p>📊 総施設数: <span id="total-count">-</span></p>
+        <p>📍 クリックで詳細表示</p>
+    </div>
+
+    <div class="legend">
+        <h3>凡例（設置者別）</h3>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #3498db;"></div>
+            <span>公立（市区町村立）</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background-color: #e74c3c;"></div>
+            <span>私立</span>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // マップの初期化（愛知県の中心付近）
+        const map = L.map('map').setView([35.1, 137.0], 10);
+
+        // OpenStreetMapタイルレイヤーを追加
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 18
+        }).addTo(map);
+
+        // マーカーの色を設定者別に分ける
+        function getMarkerColor(setsuchiCode) {
+            // P29_006: 設置者コード
+            // 3: 公立（市区町村立） - 青色
+            // 4: 私立 - 赤色
+            if (setsuchiCode === '3') {
+                return '#3498db'; // 青
+            } else if (setsuchiCode === '4') {
+                return '#e74c3c'; // 赤
+            }
+            return '#95a5a6'; // その他はグレー
+        }
+
+        // カスタムマーカーアイコンの作成
+        function createCustomIcon(color) {
+            return L.divIcon({
+                className: 'custom-marker',
+                html: `<div style="
+                    background-color: ${color};
+                    width: 12px;
+                    height: 12px;
+                    border-radius: 50%;
+                    border: 2px solid white;
+                    box-shadow: 0 0 4px rgba(0,0,0,0.4);
+                "></div>`,
+                iconSize: [12, 12],
+                iconAnchor: [6, 6]
+            });
+        }
+
+        // GeoJSONデータを読み込み
+        fetch('P29-23_23.geojson')
+            .then(response => response.json())
+            .then(data => {
+                // ローディング表示を消す
+                document.getElementById('loading').style.display = 'none';
+
+                // 総施設数を表示
+                document.getElementById('total-count').textContent = data.features.length.toLocaleString();
+
+                // GeoJSONレイヤーを追加
+                L.geoJSON(data, {
+                    pointToLayer: function(feature, latlng) {
+                        const color = getMarkerColor(feature.properties.P29_006);
+                        return L.marker(latlng, {
+                            icon: createCustomIcon(color)
+                        });
+                    },
+                    onEachFeature: function(feature, layer) {
+                        const props = feature.properties;
+
+                        // 設置者の表示名
+                        let setsuchiName = '不明';
+                        if (props.P29_006 === '3') {
+                            setsuchiName = '公立（市区町村立）';
+                        } else if (props.P29_006 === '4') {
+                            setsuchiName = '私立';
+                        }
+
+                        // 廃校フラグ
+                        const haikouStatus = props.P29_007 === '1' ? '【廃校】' : '';
+
+                        // ポップアップの内容
+                        const popupContent = `
+                            <div style="font-family: sans-serif; min-width: 200px;">
+                                <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #333;">
+                                    ${haikouStatus}${props.P29_004 || '名称不明'}
+                                </h3>
+                                <table style="width: 100%; font-size: 13px; line-height: 1.8;">
+                                    <tr>
+                                        <td style="color: #666; padding-right: 10px;">📍 所在地:</td>
+                                        <td>${props.P29_005 || '-'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="color: #666;">🏫 設置者:</td>
+                                        <td>${setsuchiName}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="color: #666;">🔢 学校コード:</td>
+                                        <td style="font-size: 11px;">${props.P29_002 || '-'}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="color: #666;">🗺️ 行政区域:</td>
+                                        <td>${props.P29_001 || '-'}</td>
+                                    </tr>
+                                </table>
+                                ${props.P29_009 ? `<p style="margin-top: 8px; font-size: 12px; color: #888;">※ ${props.P29_009}</p>` : ''}
+                            </div>
+                        `;
+
+                        layer.bindPopup(popupContent);
+                    }
+                }).addTo(map);
+
+                console.log(`✅ ${data.features.length}件の施設データを読み込みました`);
+            })
+            .catch(error => {
+                console.error('❌ データの読み込みに失敗しました:', error);
+                document.getElementById('loading').innerHTML =
+                    'データの読み込みに失敗しました。<br>P29-23_23.geojson ファイルが同じディレクトリにあるか確認してください。';
+                document.getElementById('loading').style.color = 'red';
+            });
+    </script>
+</body>
+</html>
