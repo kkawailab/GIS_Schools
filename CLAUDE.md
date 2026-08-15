@@ -45,6 +45,8 @@ No automated tests. Manual testing workflow:
 ```
 ├── index.html                    # Single-file application with embedded CSS/JS
 ├── P29-23_23.geojson            # School facility data (~966KB, 2,641 point features)
+├── P29-23_23_highschools.geojson # Subset: high schools only (P29_003=16004, 223 features)
+├── P29-23_23_universities.geojson # Subset: universities only (P29_003=16007, 78 features)
 ├── P29-23_23_structure.md       # GeoJSON schema documentation
 ├── EXERCISES.md                  # Feature-extension exercises (基礎〜エキスパート)
 ├── README.md                     # User-facing documentation (Japanese)
@@ -65,7 +67,7 @@ GeoJSON Point features in `[longitude, latitude]` order, CRS JGD2011 (EPSG:6668)
 Property codes from the MLIT P29 standard:
 - `P29_001`: Administrative area code
 - `P29_002`: School code
-- `P29_003`: School type code (e.g. 16001 = elementary, 16011 = kindergarten). The data contains 13 distinct codes; `P29-23_23_structure.md` does not enumerate them all — see the MLIT code list: https://nlftp.mlit.go.jp/ksj/gml/codelist/SchoolClassCd.html
+- `P29_003`: School type code (e.g. 16001 = elementary, 16004 = high school, 16007 = university, 16011 = kindergarten). The data contains 13 distinct codes — a full name-verified table with counts is in README.md's 改造レシピ section; official codes: https://nlftp.mlit.go.jp/ksj/gml/codelist/SchoolClassCd.html
 - `P29_004`: School name
 - `P29_005`: Address
 - `P29_006`: **Operator code** — the actual data contains `"0"`–`"4"`, not just the two values documented in `P29-23_23_structure.md`. Distribution: `"3"` municipal public (1,494), `"4"` private (944), `"2"` prefectural (185), `"1"` national (17), `"0"` other (1)

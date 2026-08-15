@@ -37,7 +37,9 @@
 ```
 GIS_Schools/
 ├── index.html                    # メインのWebアプリケーション
-├── P29-23_23.geojson            # 学校データ（GeoJSON形式）
+├── P29-23_23.geojson            # 学校データ（GeoJSON形式・全種別2,641件）
+├── P29-23_23_highschools.geojson # 高等学校のみの抽出データ（223件・改造用）
+├── P29-23_23_universities.geojson # 大学のみの抽出データ（78件・改造用）
 ├── P29-23_23_structure.md       # データ構造の説明書
 ├── EXERCISES.md                  # 練習問題集（機能拡張の課題）
 ├── README.md                     # このファイル
@@ -148,6 +150,108 @@ JavaScriptの処理は次の流れで動きます。
 5. **ポップアップの設定**: マーカークリック時に学校の詳細情報を表示
 
 コードを変更したら、ブラウザで再読み込み（`F5` キー）するだけで結果を確認できます。ビルド（変換処理）は不要です。
+
+## 改造レシピ：高校・大学のデータを使う
+
+改造の練習用に、元データ（`P29-23_23.geojson`）から学校種別コード（P29_003）で抽出した2つのデータファイルを同梱しています。
+
+| ファイル | 内容 | 件数 |
+|---------|------|------|
+| `P29-23_23_highschools.geojson` | 高等学校（P29_003 = 16004） | 223件 |
+| `P29-23_23_universities.geojson` | 大学（P29_003 = 16007） | 78件 |
+
+データ構造は元ファイルとまったく同じなので、既存のコードがそのまま使えます。
+
+### レシピ1: 表示するデータを高校だけにする（初心者向け）
+
+`index.html` のデータ読み込み部分のファイル名を1か所書き換えるだけです。
+
+```js
+// 変更前
+fetch('P29-23_23.geojson')
+
+// 変更後
+fetch('P29-23_23_highschools.geojson')
+```
+
+保存してブラウザを再読み込みすると、高校223件だけの地図になります。大学だけにしたい場合は `P29-23_23_universities.geojson` を指定してください。
+
+> **ヒント**: 高校は県立（設置者コード"2"）、大学は国立（"1"）が多く、現在の色分けルールではどちらもグレー表示になります。`getMarkerColor()` に `if (setsuchiCode === '2') return '#27ae60';` のような分岐を追加して、国公立用の色を作ってみましょう（凡例への追加もお忘れなく）。
+
+### レシピ2: 高校・大学をレイヤーとして重ねて切り替える
+
+元の全学校データはそのままに、高校・大学を色違いの別レイヤーとして追加し、チェックボックスで表示を切り替える例です。既存の `<script>` 内の末尾（fetch処理の後）に追加します。
+
+```js
+// 種別ごとのレイヤーを作る共通関数（ポップアップは学校名と所在地のみの簡易版）
+function createSchoolLayer(data, color) {
+    return L.geoJSON(data, {
+        pointToLayer: (feature, latlng) =>
+            L.marker(latlng, { icon: createCustomIcon(color) }),
+        onEachFeature: (feature, layer) => {
+            const props = feature.properties;
+            layer.bindPopup(`<strong>${props.P29_004 || '名称不明'}</strong><br>${props.P29_005 || ''}`);
+        }
+    });
+}
+
+// 高校・大学のデータを読み込んで、レイヤー切り替えコントロールを追加
+Promise.all([
+    fetch('P29-23_23_highschools.geojson').then(res => res.json()),
+    fetch('P29-23_23_universities.geojson').then(res => res.json())
+]).then(([highschools, universities]) => {
+    const overlays = {
+        '🏫 高等学校': createSchoolLayer(highschools, '#9b59b6'),  // 紫
+        '🎓 大学': createSchoolLayer(universities, '#f39c12')      // オレンジ
+    };
+    L.control.layers(null, overlays, { collapsed: false }).addTo(map);
+});
+```
+
+AIに任せる場合のプロンプト例：
+
+```
+「index.htmlに、P29-23_23_highschools.geojson（高校）と
+P29-23_23_universities.geojson（大学）を別レイヤーとして読み込み、
+L.control.layers()で表示を切り替えられるようにしてください。
+高校は紫（#9b59b6）、大学はオレンジ（#f39c12）のマーカーで表示し、
+既存のポップアップ処理と凡例は維持してください」
+```
+
+### レシピ3: 他の学校種別のデータを自分で抽出する
+
+元データに含まれる学校種別と件数は以下のとおりです（種別名はデータ内の学校名から判定したものです。正式なコード定義は国土数値情報のページを参照してください）。
+
+| コード | 種別 | 件数 |
+|--------|------|------|
+| 16001 | 小学校 | 967 |
+| 16002 | 中学校 | 435 |
+| 16003 | 中等教育学校 | 1 |
+| 16004 | 高等学校 | 223 |
+| 16005 | 高等専門学校 | 1 |
+| 16006 | 短期大学 | 18 |
+| 16007 | 大学 | 78 |
+| 16011 | 幼稚園 | 390 |
+| 16012 | 特別支援学校 | 43 |
+| 16013 | 幼保連携型認定こども園 | 250 |
+| 16014 | 義務教育学校 | 2 |
+| 16015 | 各種学校 | 61 |
+| 16016 | 専修学校 | 172 |
+
+リポジトリのフォルダで以下のコマンドを実行すると、好きな種別を抽出できます（例: 小学校）。
+
+```bash
+python3 - <<'EOF'
+import json
+src = json.load(open('P29-23_23.geojson', encoding='utf-8'))
+codes = {'16001'}  # 抽出したい学校種別コード（複数指定可: {'16001', '16002'}）
+src['features'] = [f for f in src['features'] if f['properties']['P29_003'] in codes]
+json.dump(src, open('elementary.geojson', 'w', encoding='utf-8'), ensure_ascii=False)
+print(f"{len(src['features'])}件を書き出しました")
+EOF
+```
+
+> **注意**: 抽出したファイルも元データと同じ CC BY 4.0 ライセンスの加工データです。再配布する場合は「ライセンス」セクションと同じ出典表示が必要です。
 
 ## 使用技術
 
