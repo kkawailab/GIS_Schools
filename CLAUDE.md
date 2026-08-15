@@ -4,19 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a web-based GIS application that visualizes school facilities in Aichi Prefecture, Japan using Leaflet.js and GeoJSON data from the Ministry of Land, Infrastructure, Transport and Tourism (MLIT).
+This is a web-based GIS application that visualizes school facilities in Aichi Prefecture, Japan using Leaflet.js and GeoJSON data from the Ministry of Land, Infrastructure, Transport and Tourism (MLIT). It doubles as a teaching repository: `EXERCISES.md` defines a ladder of feature-extension exercises (filtering, search, clustering, PWA, etc.) that users will commonly ask to implement here.
 
 **Key characteristics:**
-- Static single-page application (no build process)
-- Client-side only (no backend server)
-- Uses vanilla JavaScript (no framework)
+- Static single-page application (no build process, no framework, no backend)
+- All application code lives in `index.html` (embedded CSS/JS)
 - Data source: National Land Numerical Information (School Data P29-2023)
+- Documentation, UI text, and commit messages are written in Japanese — follow that convention
 
 ## Development Commands
 
 ### Running the Application
 
-The application requires a local web server due to CORS restrictions when loading GeoJSON files:
+The application requires a local web server because `fetch()` of the GeoJSON file is blocked under the `file://` protocol:
 
 ```bash
 # Python 3 (recommended)
@@ -34,7 +34,7 @@ Access at `http://localhost:8000`
 
 No automated tests. Manual testing workflow:
 1. Start local server
-2. Verify map loads with school markers
+2. Verify map loads with school markers and the total count appears in the info panel
 3. Check popup displays when clicking markers
 4. Verify legend and info panel display correctly
 
@@ -44,38 +44,41 @@ No automated tests. Manual testing workflow:
 
 ```
 ├── index.html                    # Single-file application with embedded CSS/JS
-├── P29-23_23.geojson            # School facility data (944KB, ~7000+ features)
+├── P29-23_23.geojson            # School facility data (~966KB, 2,641 point features)
 ├── P29-23_23_structure.md       # GeoJSON schema documentation
-├── README.md                     # User-facing documentation
+├── EXERCISES.md                  # Feature-extension exercises (基礎〜エキスパート)
+├── README.md                     # User-facing documentation (Japanese)
 └── LICENSE                       # MIT (code) + CC BY 4.0 (data)
 ```
 
 ### Application Flow
 
-1. **Map Initialization**: Leaflet map centered on Aichi Prefecture (35.1°N, 137.0°E)
+1. **Map Initialization**: Leaflet map centered on Aichi Prefecture (35.1°N, 137.0°E), zoom 10
 2. **Data Loading**: Async fetch of `P29-23_23.geojson` from same directory
-3. **Marker Rendering**: Each GeoJSON feature converted to color-coded marker
-4. **Interaction**: Click handlers bind popups with facility details
+3. **Marker Rendering**: Each GeoJSON feature converted to a color-coded `divIcon` marker
+4. **Interaction**: `onEachFeature` binds popups with facility details
 
 ### Data Schema
 
-GeoJSON features use property codes from MLIT standard:
+GeoJSON Point features in `[longitude, latitude]` order, CRS JGD2011 (EPSG:6668) — coordinates work directly with Leaflet's default handling. **All property values are strings** — compare against string literals (`'3'`), never numbers.
+
+Property codes from the MLIT P29 standard:
 - `P29_001`: Administrative area code
 - `P29_002`: School code
-- `P29_003`: School type code (16011 = kindergarten, etc.)
+- `P29_003`: School type code (e.g. 16001 = elementary, 16011 = kindergarten). The data contains 13 distinct codes; `P29-23_23_structure.md` does not enumerate them all — see the MLIT code list: https://nlftp.mlit.go.jp/ksj/gml/codelist/SchoolClassCd.html
 - `P29_004`: School name
 - `P29_005`: Address
-- `P29_006`: **Operator code** (3 = public/municipal, 4 = private)
-- `P29_007`: Closure flag (0 = active, 1 = closed)
+- `P29_006`: **Operator code** — the actual data contains `"0"`–`"4"`, not just the two values documented in `P29-23_23_structure.md`. Distribution: `"3"` municipal public (1,494), `"4"` private (944), `"2"` prefectural (185), `"1"` national (17), `"0"` other (1)
+- `P29_007`: Closure flag (`"0"` = active, `"1"` = closed; closed schools get a 【廃校】 prefix in popups)
 - `P29_008`: Campus code
-- `P29_009`: Notes (optional)
+- `P29_009`: Notes (optional, often null)
 
 ### Marker Color Logic
 
-Markers are color-coded by operator type (P29_006):
-- Blue (#3498db): Public schools (code "3")
-- Red (#e74c3c): Private schools (code "4")
-- Gray (#95a5a6): Other/unknown
+`getMarkerColor()` colors by operator type (P29_006):
+- Blue (#3498db): `"3"` public (municipal)
+- Red (#e74c3c): `"4"` private
+- Gray (#95a5a6): everything else — **this includes all 202 national (`"1"`) and prefectural (`"2"`) schools** (e.g. prefectural high schools), which the legend does not mention. Extending the color scheme to those codes is a natural improvement users may request.
 
 ## Code Modification Guidelines
 
@@ -91,7 +94,7 @@ To add additional GeoJSON datasets:
 Marker styling is controlled by:
 - `getMarkerColor()`: Returns hex color based on property value
 - `createCustomIcon()`: Generates Leaflet divIcon with inline styles
-- CSS `.custom-marker` class (currently unused but available)
+- CSS `.custom-marker` class (assigned to the divIcon but currently has no CSS rule)
 
 ### Error Handling
 
